@@ -915,6 +915,19 @@ class DatabaseManager:
             ).scalars().first()
             return result
 
+    def delete_analysis_history(self, record_id: int) -> bool:
+        """
+        Delete a single analysis history record by primary key.
+
+        Returns:
+            True if a record was deleted, False if not found.
+        """
+        with self.session_scope() as session:
+            result = session.execute(
+                delete(AnalysisHistory).where(AnalysisHistory.id == record_id)
+            )
+            return result.rowcount > 0
+
     def get_latest_analysis_by_query_id(self, query_id: str) -> Optional[AnalysisHistory]:
         """
         根据 query_id 查询最新一条分析历史记录

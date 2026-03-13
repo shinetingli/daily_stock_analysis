@@ -55,7 +55,8 @@ class StockAnalysisPipeline:
         source_message: Optional[BotMessage] = None,
         query_id: Optional[str] = None,
         query_source: Optional[str] = None,
-        save_context_snapshot: Optional[bool] = None
+        save_context_snapshot: Optional[bool] = None,
+        progress_callback: Optional[callable] = None,
     ):
         """
         初始化调度器
@@ -72,7 +73,8 @@ class StockAnalysisPipeline:
         self.save_context_snapshot = (
             self.config.save_context_snapshot if save_context_snapshot is None else save_context_snapshot
         )
-        
+        self._progress_callback = progress_callback
+
         # 初始化各模块
         self.db = get_db()
         self.fetcher_manager = DataFetcherManager()
@@ -107,6 +109,14 @@ class StockAnalysisPipeline:
         else:
             logger.warning("搜索服务未启用（未配置 API Key）")
     
+    def _report_progress(self, progress: int, message: str) -> None:
+        """Report progress to callback if available."""
+        if self._progress_callback:
+            try:
+                self._progress_callback(progress, message)
+            except Exception:
+                pass
+
     def fetch_and_save_stock_data(
         self, 
         code: str,
@@ -182,10 +192,9 @@ class StockAnalysisPipeline:
             AnalysisResult 或 None（如果分析失败）
         """
         try:
-            # 获取股票名称（优先从实时行情获取真实名称）
             stock_name = self.fetcher_manager.get_stock_name(code)
 
-            # Step 1: 获取实时行情（量比、换手率等）- 使用统一入口，自动故障切换
+            self._report_progress(20, "正在获取实时行情...")
             realtime_quote = None
             try:
                 realtime_quote = self.fetcher_manager.get_realtime_quote(code)
@@ -208,7 +217,7 @@ class StockAnalysisPipeline:
             if not stock_name:
                 stock_name = f'股票{code}'
 
-            # Step 2: 获取筹码分布 - 使用统一入口，带熔断保护
+            self._report_progress(30, "正在分析筹码分布...")
             chip_data = None
             try:
                 chip_data = self.fetcher_manager.get_chip_distribution(code)
@@ -231,9 +240,10 @@ class StockAnalysisPipeline:
 
             if use_agent:
                 logger.info(f"{stock_name}({code}) 启用 Agent 模式进行分析")
+                self._report_progress(40, "Agent 模式分析中...")
                 return self._analyze_with_agent(code, report_type, query_id, stock_name, realtime_quote, chip_data)
-            
-            # Step 3: 趋势分析（基于交易理念）
+
+            self._report_progress(40, "正在进行趋势分析...")
             trend_result: Optional[TrendAnalysisResult] = None
             try:
                 end_date = date.today()
@@ -250,9 +260,9 @@ class StockAnalysisPipeline:
             except Exception as e:
                 logger.warning(f"{stock_name}({code}) 趋势分析失败: {e}", exc_info=True)
 
-            # Step 4: 多维度情报搜索（最新消息+风险排查+业绩预期）
             news_context = None
             if self.search_service.is_available:
+                self._report_progress(50, "正在搜索相关资讯...")
                 logger.info(f"{stock_name}({code}) 开始多维度情报搜索...")
 
                 # 使用多维度搜索（最多5次搜索）
@@ -289,7 +299,7 @@ class StockAnalysisPipeline:
             else:
                 logger.info(f"{stock_name}({code}) 搜索服务不可用，跳过情报搜索")
 
-            # Step 5: 获取分析上下文（技术面数据）
+            self._report_progress(65, "正在构建分析上下文...")
             context = self.db.get_analysis_context(code)
 
             if context is None:
@@ -312,7 +322,7 @@ class StockAnalysisPipeline:
                 stock_name  # 传入股票名称
             )
             
-            # Step 7: 调用 AI 分析（传入增强的上下文和新闻）
+            self._report_progress(75, "AI 正在生成分析报告...")
             result = self.analyzer.analyze(enhanced_context, news_context=news_context)
 
             # Step 7.5: 填充分析时的价格信息到 result
@@ -326,7 +336,7 @@ class StockAnalysisPipeline:
             if result and chip_data:
                 fill_chip_structure_if_needed(result, chip_data)
 
-            # Step 8: 保存分析历史记录
+            self._report_progress(90, "正在保存分析结果...")
             if result:
                 try:
                     context_snapshot = self._build_context_snapshot(
@@ -532,11 +542,11 @@ class StockAnalysisPipeline:
             if chip_data:
                 initial_context["chip_distribution"] = self._safe_to_dict(chip_data)
 
-            # 运行 Agent
+            self._report_progress(50, "Agent 正在搜索和分析...")
             message = f"请分析股票 {code} ({stock_name})，并生成决策仪表盘报告。"
             agent_result = executor.run(message, context=initial_context)
 
-            # 转换为 AnalysisResult
+            self._report_progress(75, "正在生成分析报告...")
             result = self._agent_result_to_analysis_result(agent_result, code, stock_name, report_type, query_id)
             if result:
                 result.query_id = query_id
@@ -580,7 +590,7 @@ class StockAnalysisPipeline:
                 except Exception as e:
                     logger.warning(f"[{code}] Agent 模式保存新闻情报失败: {e}")
 
-            # 保存分析历史记录
+            self._report_progress(90, "正在保存分析结果...")
             if result:
                 try:
                     initial_context["stock_name"] = resolved_stock_name
@@ -902,9 +912,9 @@ class StockAnalysisPipeline:
             AnalysisResult 或 None
         """
         logger.info(f"========== 开始处理 {code} ==========")
-        
+
         try:
-            # Step 1: 获取并保存数据
+            self._report_progress(10, "正在获取行情数据...")
             success, error = self.fetch_and_save_stock_data(code)
             
             if not success:

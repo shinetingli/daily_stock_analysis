@@ -320,6 +320,24 @@ class AnalysisTaskQueue:
                 stats[task.status.value] = stats.get(task.status.value, 0) + 1
             return stats
     
+    def update_task_progress(self, task_id: str, progress: int, message: str) -> None:
+        """
+        Update task progress and broadcast to SSE subscribers.
+
+        Args:
+            task_id: task identifier
+            progress: progress percentage (0-100)
+            message: human-readable stage description
+        """
+        with self._data_lock:
+            task = self._tasks.get(task_id)
+            if not task or task.status != TaskStatus.PROCESSING:
+                return
+            task.progress = progress
+            task.message = message
+
+        self._broadcast_event("task_progress", task.to_dict())
+
     # ========== 任务执行 ==========
     
     def _execute_task(
@@ -354,16 +372,18 @@ class AnalysisTaskQueue:
         self._broadcast_event("task_started", task.to_dict())
         
         try:
-            # 导入分析服务（延迟导入避免循环依赖）
             from src.services.analysis_service import AnalysisService
-            
-            # 执行分析
+
+            def progress_callback(progress: int, message: str) -> None:
+                self.update_task_progress(task_id, progress, message)
+
             service = AnalysisService()
             result = service.analyze_stock(
                 stock_code=stock_code,
                 report_type=report_type,
                 force_refresh=force_refresh,
                 query_id=task_id,
+                progress_callback=progress_callback,
             )
             
             if result:

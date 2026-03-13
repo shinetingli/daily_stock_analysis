@@ -12,7 +12,7 @@
 
 import logging
 import uuid
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Callable
 
 from src.repositories.analysis_repo import AnalysisRepository
 
@@ -36,7 +36,8 @@ class AnalysisService:
         report_type: str = "detailed",
         force_refresh: bool = False,
         query_id: Optional[str] = None,
-        send_notification: bool = True
+        send_notification: bool = True,
+        progress_callback: Optional[Callable[[int, str], None]] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         执行股票分析
@@ -67,11 +68,11 @@ class AnalysisService:
             # 获取配置
             config = get_config()
             
-            # 创建分析流水线
             pipeline = StockAnalysisPipeline(
                 config=config,
                 query_id=query_id,
-                query_source="api"
+                query_source="api",
+                progress_callback=progress_callback,
             )
             
             # 确定报告类型 (API: simple/detailed/brief -> ReportType)

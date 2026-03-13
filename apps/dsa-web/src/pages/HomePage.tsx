@@ -79,6 +79,7 @@ const HomePage: React.FC = () => {
       });
     },
     onTaskStarted: updateTask,
+    onTaskProgress: updateTask,
     onTaskCompleted: (task) => {
       // 刷新历史列表
       fetchHistory();
@@ -208,6 +209,38 @@ const HomePage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 重新分析历史记录中的股票
+  const handleHistoryRefresh = async (code: string) => {
+    setDuplicateError(null);
+    setStoreError(null);
+    try {
+      await analysisApi.analyzeAsync({
+        stockCode: code,
+        reportType: 'detailed',
+      });
+    } catch (err) {
+      if (err instanceof DuplicateTaskError) {
+        setDuplicateError(`股票 ${err.stockCode} 正在分析中，请等待完成`);
+      } else {
+        setStoreError(getParsedApiError(err));
+      }
+    }
+  };
+
+  // 删除历史记录
+  const handleHistoryDelete = async (recordId: number) => {
+    try {
+      await historyApi.delete(recordId);
+      setHistoryItems(prev => prev.filter(item => item.id !== recordId));
+      if (selectedReport?.meta.id === recordId) {
+        setSelectedReport(null);
+      }
+    } catch (err) {
+      console.error('Failed to delete history:', err);
+      setStoreError(getParsedApiError(err));
+    }
+  };
+
   // 点击历史项加载报告
   const handleHistoryClick = async (recordId: number) => {
     // Increment request ID to cancel any in-flight auto-select result.
@@ -293,6 +326,8 @@ const HomePage: React.FC = () => {
         hasMore={hasMore}
         selectedId={selectedReport?.meta.id}
         onItemClick={(id) => { handleHistoryClick(id); setSidebarOpen(false); }}
+        onItemDelete={handleHistoryDelete}
+        onItemRefresh={handleHistoryRefresh}
         onLoadMore={handleLoadMore}
         className="max-h-[62vh] md:max-h-[62vh] flex-1 overflow-hidden"
       />

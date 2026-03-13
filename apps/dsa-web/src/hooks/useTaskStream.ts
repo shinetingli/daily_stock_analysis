@@ -9,6 +9,7 @@ export type SSEEventType =
   | 'connected'
   | 'task_created'
   | 'task_started'
+  | 'task_progress'
   | 'task_completed'
   | 'task_failed'
   | 'heartbeat';
@@ -30,6 +31,8 @@ export interface UseTaskStreamOptions {
   onTaskCreated?: (task: TaskInfo) => void;
   /** 任务开始回调 */
   onTaskStarted?: (task: TaskInfo) => void;
+  /** 任务进度更新回调 */
+  onTaskProgress?: (task: TaskInfo) => void;
   /** 任务完成回调 */
   onTaskCompleted?: (task: TaskInfo) => void;
   /** 任务失败回调 */
@@ -79,6 +82,7 @@ export function useTaskStream(options: UseTaskStreamOptions = {}): UseTaskStream
   const {
     onTaskCreated,
     onTaskStarted,
+    onTaskProgress,
     onTaskCompleted,
     onTaskFailed,
     onConnected,
@@ -97,17 +101,18 @@ export function useTaskStream(options: UseTaskStreamOptions = {}): UseTaskStream
   const callbacksRef = useRef({
     onTaskCreated,
     onTaskStarted,
+    onTaskProgress,
     onTaskCompleted,
     onTaskFailed,
     onConnected,
     onError,
   });
 
-  // 每次渲染时更新回调 ref（确保事件处理使用最新回调）
   useEffect(() => {
     callbacksRef.current = {
       onTaskCreated,
       onTaskStarted,
+      onTaskProgress,
       onTaskCompleted,
       onTaskFailed,
       onConnected,
@@ -169,6 +174,12 @@ export function useTaskStream(options: UseTaskStreamOptions = {}): UseTaskStream
     eventSource.addEventListener('task_started', (e) => {
       const task = parseEventData(e.data);
       if (task) callbacksRef.current.onTaskStarted?.(task);
+    });
+
+    // 任务进度更新
+    eventSource.addEventListener('task_progress', (e) => {
+      const task = parseEventData(e.data);
+      if (task) callbacksRef.current.onTaskProgress?.(task);
     });
 
     // 任务完成

@@ -52,6 +52,14 @@ export const historyApi = {
   },
 
   /**
+   * 删除历史分析记录
+   * @param recordId 分析历史记录主键 ID
+   */
+  delete: async (recordId: number): Promise<void> => {
+    await apiClient.delete(`/api/v1/history/${recordId}`);
+  },
+
+  /**
    * 获取历史报告关联新闻
    * @param recordId 分析历史记录主键 ID
    * @param limit 返回数量限制

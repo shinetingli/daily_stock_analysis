@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import type { HistoryItem } from '../../types/analysis';
 import { getSentimentColor } from '../../types/analysis';
 import { formatDateTime } from '../../utils/format';
@@ -9,8 +9,10 @@ interface HistoryListProps {
   isLoading: boolean;
   isLoadingMore: boolean;
   hasMore: boolean;
-  selectedId?: number;  // Selected history record ID
-  onItemClick: (recordId: number) => void;  // Callback with record ID
+  selectedId?: number;
+  onItemClick: (recordId: number) => void;
+  onItemDelete?: (recordId: number) => void;
+  onItemRefresh?: (stockCode: string) => void;
   onLoadMore: () => void;
   className?: string;
 }
@@ -26,11 +28,26 @@ export const HistoryList: React.FC<HistoryListProps> = ({
   hasMore,
   selectedId,
   onItemClick,
+  onItemDelete,
+  onItemRefresh,
   onLoadMore,
   className = '',
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
+  const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (menuOpenId === null) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpenId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [menuOpenId]);
 
   // 使用 IntersectionObserver 检测滚动到底部
   const handleObserver = useCallback(
@@ -87,53 +104,111 @@ export const HistoryList: React.FC<HistoryListProps> = ({
         ) : (
           <div className="space-y-1.5">
             {items.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => onItemClick(item.id)}
-                className={`history-item w-full text-left ${selectedId === item.id ? 'active' : ''
-                  }`}
-              >
-                <div className="flex items-center gap-2 w-full">
-                  {/* 情感分数指示条 */}
-                  {item.sentimentScore !== undefined && (
-                    <span
-                      className="w-0.5 h-8 rounded-full flex-shrink-0"
-                      style={{
-                        backgroundColor: getSentimentColor(item.sentimentScore),
-                        boxShadow: `0 0 6px ${getSentimentColor(item.sentimentScore)}40`
-                      }}
-                    />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-1.5">
-                      <span className="font-medium text-white truncate text-xs">
-                        {item.stockName || item.stockCode}
-                      </span>
-                      {item.sentimentScore !== undefined && (
-                        <span
-                          className="text-xs font-mono font-semibold px-1 py-0.5 rounded"
-                          style={{
-                            color: getSentimentColor(item.sentimentScore),
-                            backgroundColor: `${getSentimentColor(item.sentimentScore)}15`
-                          }}
-                        >
-                          {item.sentimentScore}
+              <div key={item.id} className="group relative">
+                <button
+                  type="button"
+                  onClick={() => onItemClick(item.id)}
+                  className={`history-item w-full text-left ${selectedId === item.id ? 'active' : ''}`}
+                >
+                  <div className="flex items-center gap-2 w-full">
+                    {item.sentimentScore !== undefined && (
+                      <span
+                        className="w-0.5 h-8 rounded-full flex-shrink-0"
+                        style={{
+                          backgroundColor: getSentimentColor(item.sentimentScore),
+                          boxShadow: `0 0 6px ${getSentimentColor(item.sentimentScore)}40`
+                        }}
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-1.5">
+                        <span className="font-medium text-white truncate text-xs">
+                          {item.stockName || item.stockCode}
                         </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className="text-xs text-muted font-mono">
-                        {item.stockCode}
-                      </span>
-                      <span className="text-xs text-muted/50">·</span>
-                      <span className="text-xs text-muted">
-                        {formatDateTime(item.createdAt)}
-                      </span>
+                        {item.sentimentScore !== undefined && (
+                          <span
+                            className="text-xs font-mono font-semibold px-1 py-0.5 rounded"
+                            style={{
+                              color: getSentimentColor(item.sentimentScore),
+                              backgroundColor: `${getSentimentColor(item.sentimentScore)}15`
+                            }}
+                          >
+                            {item.sentimentScore}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-xs text-muted font-mono">
+                          {item.stockCode}
+                        </span>
+                        <span className="text-xs text-muted/50">·</span>
+                        <span className="text-xs text-muted">
+                          {formatDateTime(item.createdAt)}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </button>
+                </button>
+                {(onItemDelete || onItemRefresh) && (
+                  <div className="absolute right-1 top-1/2 -translate-y-1/2">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMenuOpenId(menuOpenId === item.id ? null : item.id);
+                      }}
+                      className={`p-1 rounded text-muted hover:text-white hover:bg-white/10 transition-all ${
+                        menuOpenId === item.id ? 'opacity-100 bg-white/10 text-white' : 'opacity-0 group-hover:opacity-100'
+                      }`}
+                    >
+                      <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="5" r="2" />
+                        <circle cx="12" cy="12" r="2" />
+                        <circle cx="12" cy="19" r="2" />
+                      </svg>
+                    </button>
+                    {menuOpenId === item.id && (
+                      <div
+                        ref={menuRef}
+                        className="absolute right-0 top-full mt-1 z-50 min-w-[100px] py-1 rounded-lg bg-[#1e1e2e] border border-white/10 shadow-xl shadow-black/40"
+                      >
+                        {onItemRefresh && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setMenuOpenId(null);
+                              onItemRefresh(item.stockCode);
+                            }}
+                            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-cyan hover:bg-cyan/10 transition-colors"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            重新分析
+                          </button>
+                        )}
+                        {onItemDelete && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setMenuOpenId(null);
+                              onItemDelete(item.id);
+                            }}
+                            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/15 transition-colors"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            删除
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             ))}
 
             {/* 加载更多触发器 */}

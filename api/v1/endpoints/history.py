@@ -232,6 +232,45 @@ def get_history_detail(
         )
 
 
+@router.delete(
+    "/{record_id}",
+    responses={
+        200: {"description": "删除成功"},
+        404: {"description": "记录不存在", "model": ErrorResponse},
+        500: {"description": "服务器错误", "model": ErrorResponse},
+    },
+    summary="删除历史分析记录",
+    description="根据记录主键 ID 删除单条历史分析记录"
+)
+def delete_history_record(
+    record_id: int,
+    db_manager: DatabaseManager = Depends(get_database_manager)
+):
+    try:
+        service = HistoryService(db_manager)
+        deleted = service.delete_history(record_id)
+        if not deleted:
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "error": "not_found",
+                    "message": f"未找到 id={record_id} 的分析记录"
+                }
+            )
+        return {"success": True, "message": f"已删除记录 {record_id}"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"删除历史记录失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "internal_error",
+                "message": f"删除历史记录失败: {str(e)}"
+            }
+        )
+
+
 @router.get(
     "/{record_id}/news",
     response_model=NewsIntelResponse,

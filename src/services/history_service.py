@@ -172,6 +172,22 @@ class HistoryService:
             logger.error(f"resolve_and_get_news failed for {record_id}: {e}", exc_info=True)
             return []
 
+    def delete_history(self, record_id: int) -> bool:
+        """
+        Delete a single analysis history record.
+
+        Args:
+            record_id: primary key ID of the record to delete
+
+        Returns:
+            True if deleted, False if not found
+        """
+        try:
+            return self.db.delete_analysis_history(record_id)
+        except Exception as e:
+            logger.error(f"Failed to delete history record {record_id}: {e}", exc_info=True)
+            return False
+
     def get_history_detail_by_id(self, record_id: int) -> Optional[Dict[str, Any]]:
         """
         获取历史报告详情

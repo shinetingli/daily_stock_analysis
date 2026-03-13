@@ -49,34 +49,39 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
         ) : null}
       </div>
 
-      {/* 任务信息 */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-white truncate">
-            {task.stockName || task.stockCode}
-          </span>
-          <span className="text-xs text-muted">
-            {task.stockCode}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-sm font-medium text-white truncate">
+              {task.stockName || task.stockCode}
+            </span>
+            <span className="text-xs text-muted">
+              {task.stockCode}
+            </span>
+          </div>
+          <span
+            className={`text-xs px-1.5 py-0.5 rounded shrink-0 ${
+              isProcessing
+                ? 'bg-cyan/20 text-cyan'
+                : 'bg-white/10 text-muted'
+            }`}
+          >
+            {isProcessing ? '分析中' : '等待中'}
           </span>
         </div>
         {task.message && (
-          <p className="text-xs text-secondary truncate mt-0.5">
+          <p className="text-xs text-secondary truncate mt-1">
             {task.message}
           </p>
         )}
-      </div>
-
-      {/* 状态标签 */}
-      <div className="flex-shrink-0">
-        <span
-          className={`text-xs px-1.5 py-0.5 rounded ${
-            isProcessing
-              ? 'bg-cyan/20 text-cyan'
-              : 'bg-white/10 text-muted'
-          }`}
-        >
-          {isProcessing ? '分析中' : '等待中'}
-        </span>
+        {isProcessing && task.progress > 0 && (
+          <div className="mt-1.5 h-1 bg-white/5 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-cyan/60 rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${task.progress}%` }}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
