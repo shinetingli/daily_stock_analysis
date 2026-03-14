@@ -19,7 +19,7 @@ on:
       force_run:
         description: '强制运行（跳过交易日检查）'
         required: false
-        default: false
+        default: true
         type: boolean
       feishu_webhook_url:
         description: '飞书 Webhook 地址（CLI 传入时使用，留空则用仓库 Secrets）'
