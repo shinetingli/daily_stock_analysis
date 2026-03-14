@@ -1,4 +1,4 @@
-name: 每日股票分析
+name: 股票分析
 
 on:
   workflow_dispatch:
