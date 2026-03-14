@@ -21,6 +21,10 @@ on:
         required: false
         default: false
         type: boolean
+      feishu_webhook_url:
+        description: '飞书 Webhook 地址（CLI 传入时使用，留空则用仓库 Secrets）'
+        required: false
+        type: string
 
 # 并发控制：同一时间只运行一个分析任务
 concurrency:
@@ -104,8 +108,8 @@ jobs:
           WECHAT_WEBHOOK_URL: ${{ secrets.WECHAT_WEBHOOK_URL }}
           WECHAT_MSG_TYPE: ${{ vars.WECHAT_MSG_TYPE || secrets.WECHAT_MSG_TYPE || 'markdown' }}
           
-          # 方式二：飞书 Webhook
-          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
+          # 方式二：飞书 Webhook（CLI 传入优先，否则用 Secrets）
+          FEISHU_WEBHOOK_URL: ${{ github.event.inputs.feishu_webhook_url || secrets.FEISHU_WEBHOOK_URL }}
           
           # 方式三：Telegram
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
