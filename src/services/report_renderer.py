@@ -10,10 +10,19 @@ Any expensive data preparation should be injected by the caller via extra_contex
 """
 
 import logging
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from zoneinfo import ZoneInfo
 
 from src.analyzer import AnalysisResult
+
+REPORT_TZ = ZoneInfo("Asia/Shanghai")
+
+
+def _now_beijing() -> datetime:
+    """Current time in Beijing (Asia/Shanghai) for report timestamps."""
+    return datetime.now(REPORT_TZ)
 from src.config import get_config
 
 logger = logging.getLogger(__name__)
@@ -106,8 +115,6 @@ def render(
     Returns:
         Rendered string, or None on error (caller should fallback).
     """
-    from datetime import datetime
-
     try:
         from jinja2 import Environment, FileSystemLoader, select_autoescape
     except ImportError:
@@ -115,7 +122,7 @@ def render(
         return None
 
     if report_date is None:
-        report_date = datetime.now().strftime("%Y-%m-%d")
+        report_date = _now_beijing().strftime("%Y-%m-%d")
 
     templates_dir = _resolve_templates_dir()
     template_name = f"report_{platform}.j2"
@@ -141,7 +148,7 @@ def render(
     sell_count = sum(1 for r in results if getattr(r, "decision_type", "") == "sell")
     hold_count = sum(1 for r in results if getattr(r, "decision_type", "") in ("hold", ""))
 
-    report_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    report_timestamp = _now_beijing().strftime("%Y-%m-%d %H:%M:%S") + "（北京时间）"
 
     def failed_checks(checklist: List[str]) -> List[str]:
         return [c for c in (checklist or []) if c.startswith("❌") or c.startswith("⚠️")]
